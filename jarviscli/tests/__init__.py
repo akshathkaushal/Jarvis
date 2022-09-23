@@ -1,6 +1,8 @@
 import unittest
 from functools import partial
 from CmdInterpreter import JarvisAPI
+from PluginManager import PluginDependency
+from collections import deque
 
 
 class MockJarvisAPI(JarvisAPI):
@@ -28,7 +30,7 @@ class MockJarvisAPI(JarvisAPI):
             build()
 
         self.data = {}
-        self._input_queue = []
+        self._input_queue = deque()
         self.is_voice_enabled = False
 
     def say(self, text, color=""):
@@ -43,7 +45,7 @@ class MockJarvisAPI(JarvisAPI):
     def input(self, prompt='', color=''):
         if len(self._input_queue) == 0:
             raise BaseException("MockJarvisAPI: No predefined answer in queue - add answer with 'self.queue_input(\"TEXT\")'")
-        return self._input_queue.pop()
+        return self._input_queue.popleft()
 
     def input_number(self, prompt='', color='', rtype=float, rmin=None, rmax=None):
         return JarvisAPI.input_number(self, prompt, color, rtype, rmin, rmax)
@@ -198,6 +200,7 @@ class PluginTest(unittest.TestCase):
     def _setUp(self):
         if 'jarvis_api' not in self.__dict__ or self.jarvis_api is None:
             self.jarvis_api = MockJarvisAPI()
+            self.plugin_dependency = PluginDependency()
 
     def load_plugin(self, plugin_class):
         """
@@ -210,6 +213,14 @@ class PluginTest(unittest.TestCase):
 
         plugin_backend = plugin_class()._backend[0]
         plugin_backend.run = partial(plugin_backend, self.jarvis_api)
+
+        valid = self.plugin_dependency.check(plugin_class())
+        if valid is True:
+            plugin_backend.valid = True
+        else:
+            print("\n\nWARNING! Can't test plugin {} ({})\n\n".format(plugin_class, valid))
+            plugin_backend.valid = False
+
         return plugin_backend
 
     def tearDown(self):

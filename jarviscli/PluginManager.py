@@ -2,7 +2,6 @@ import sys
 from functools import partial
 
 import pluginmanager
-import six
 
 import plugin
 from utilities.GeneralUtilities import warning, error, executable_exists
@@ -16,7 +15,21 @@ class PluginManager(object):
     """
 
     def __init__(self):
+        import pluginmanager.module_manager
         self._backend = pluginmanager.PluginInterface()
+
+        # patch to ignore import exception
+        _load_source = pluginmanager.module_manager.load_source
+
+        def patched_load_source(*args):
+            try:
+                return _load_source(*args)
+            except ImportError as e:
+                print(e)
+            import sys
+            return sys
+        pluginmanager.module_manager.load_source = patched_load_source
+
         self._plugin_dependency = PluginDependency()
 
         self._cache = None
@@ -46,7 +59,6 @@ class PluginManager(object):
             return
 
         self._cache = plugin.PluginStorage()
-
         self._backend.collect_plugins()
         (enabled, disabled) = self._validate_plugins(self._backend.get_plugins())
 
@@ -114,7 +126,8 @@ class PluginManager(object):
                 parent.add_plugin(name, plugin_to_add)
             else:
                 if not plugin_existing.is_callable_plugin():
-                    parent.update_plugin(name, plugin_to_add)
+                    plugin_existing.change_with(plugin_to_add)
+                    parent.add_plugin(name, plugin_to_add)
                 else:
                     error("Duplicated plugin {}!".format(name))
 
@@ -187,10 +200,6 @@ class PluginDependency(object):
     def __init__(self):
         # plugin shoud match these requirements
         self._requirement_has_network = True
-        if six.PY2:
-            self._requirement_python = plugin.PYTHON2
-        else:
-            self._requirement_python = plugin.PYTHON3
         if sys.platform == "darwin":
             self._requirement_platform = plugin.MACOS
         elif sys.platform == "win32":
@@ -204,7 +213,6 @@ class PluginDependency(object):
     def _plugin_get_requirements(self, requirements_iter):
         plugin_requirements = {
             "platform": [],
-            "python": [],
             "network": [],
             "native": []
         }
@@ -234,10 +242,6 @@ class PluginDependency(object):
             required_platform = ", ".join(plugin_requirements["platform"])
             return "Requires os {}".format(required_platform)
 
-        if not self._check_python(plugin_requirements["python"]):
-            required_python = ", ".join(plugin_requirements["python"])
-            return "Requires Python {}".format(required_python)
-
         if not self._check_network(plugin_requirements["network"], plugin):
             return "Requires networking"
 
@@ -256,12 +260,6 @@ class PluginDependency(object):
 
         return self._requirement_platform in values
 
-    def _check_python(self, values):
-        if not values:
-            return True
-
-        return self._requirement_python in values
-
     def _check_network(self, values, plugin):
         if True in values:
             if not self._requirement_has_network:
@@ -274,7 +272,13 @@ class PluginDependency(object):
     def _check_native(self, values, plugin):
         missing = ""
         for native in values:
-            if not executable_exists(native):
+            if native.startswith('!'):
+                # native should not exist
+                requirement_ok = not executable_exists(native[1:])
+            else:
+                requirement_ok = executable_exists(native)
+
+            if not requirement_ok:
                 missing += native
                 missing += " "
 

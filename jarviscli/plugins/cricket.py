@@ -1,7 +1,7 @@
 from colorama import Fore
-from pycricbuzz import Cricbuzz
+
 from plugin import plugin, require
-from plugins.animations import SpinnerThread
+from pycricbuzz import Cricbuzz
 
 
 @require(network=True)
@@ -19,8 +19,7 @@ class Cricket():
         self.score(jarvis)
 
     def _refresh(self, jarvis):
-        spinner = SpinnerThread('Fetching ', 0.15)
-        spinner.start()
+        jarvis.spinner_start('Fetching ')
         self.all_match_data = self.c.matches()
         self.matches = []
         d = {}
@@ -29,8 +28,7 @@ class Cricket():
             d['srs'] = match['srs']
             d['mnum'] = match['mnum']
             self.matches.append(d.copy())
-        spinner.stop()
-        jarvis.say('DONE fetching match details', Fore.GREEN)
+        jarvis.spinner_stop('DONE fetching match details')
 
     def live_score(self, index):
         if self.all_match_data[index]['mchstate'] == 'preview':
@@ -70,11 +68,9 @@ class Cricket():
     def commentary(self, index):
         selected_match = self.all_match_data[index]
         data = self.c.commentary(self.matches[index]['id'])
-        comm = {}
-        comm['matchinfo'] = "{}, {}".format(
-            selected_match['srs'], selected_match['mnum'])
-        comm['status'] = "{}".format(selected_match['status'])
-        comm['commentary'] = data['commentary']
+        comm = {'matchinfo': "{}, {}".format(
+            selected_match['srs'], selected_match['mnum']), 'status': "{}".format(selected_match['status']),
+            'commentary': data['commentary']}
         text = []
         for com in comm['commentary']:
             line = ''
@@ -107,11 +103,9 @@ class Cricket():
     def scorecard(self, index):
         selected_match = self.all_match_data[index]
         data = self.c.scorecard(self.matches[index]['id'])
-        card = {}
-        card['matchinfo'] = "{}, {}".format(
-            selected_match['srs'], selected_match['mnum'])
-        card['status'] = "{}".format(selected_match['status'])
-        card['scorecard'] = data['scorecard']
+        card = {'matchinfo': "{}, {}".format(
+            selected_match['srs'], selected_match['mnum']), 'status': "{}".format(selected_match['status']),
+            'scorecard': data['scorecard']}
         text = ''
         text += Fore.LIGHTYELLOW_EX + \
             card['matchinfo'] + '\n' + card['status'] + '\n\n'
@@ -158,7 +152,7 @@ class Cricket():
         res = self.live_score(selected_match_id)
         print(res)
 
-        if(res == Fore.RED + "MATCH YET TO BEGIN"):
+        if res == Fore.RED + "MATCH YET TO BEGIN":
             return
 
         while True:

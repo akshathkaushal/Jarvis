@@ -1,8 +1,6 @@
-from plugin import plugin
-import os
-import subprocess
-import sys
 import webbrowser
+
+from plugin import plugin
 
 
 @plugin("buy")
@@ -50,7 +48,6 @@ def shop(shopName):
     return startingURL
 
 
-# Gets the first part of search url and adds the search term to generate the full url
 def generateURL(startingURL, searchTerm, splitted):
     if(splitted):
         splittedTerm = searchTerm
